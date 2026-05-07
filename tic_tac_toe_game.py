@@ -391,63 +391,49 @@ html, body, [class*="css"] {{
     margin-bottom: 20px;
 }}
 
-.stButton > button {{
+div[data-testid="stButton"] button {{
     width: 100%;
     height: 140px;
     font-size: 48px;
     border-radius: 20px;
     border: none;
-    background-color: #1f1f26;
+    background-color: {CARD};
     color: white;
+    transition: 0.2s;
 }}
 
-.menu-btn > button {{
-    height: 50px !important;
-    font-size: 16px !important;
+div[data-testid="stButton"] button:hover {{
+    transform: scale(1.03);
 }}
 
 </style>
 """, unsafe_allow_html=True)
 
-# ---------- GLOBALS ----------
+# ---------- CONSTANTS ----------
 player = "X"
 ai = "O"
 
 SCORE_FILE = "scores.txt"
 
 # ---------- SESSION ----------
-if "board" not in st.session_state:
-    st.session_state.board = [" "] * 9
+defaults = {
+    "board": [" "] * 9,
+    "difficulty": "Hard",
+    "player_score": 0,
+    "ai_score": 0,
+    "draws": 0,
+    "status": "Your Turn",
+    "game_over": False,
+    "winner_combo": [],
+    "result": "",
+    "page": "home",
+    "starting_player": "player"
+}
 
-if "difficulty" not in st.session_state:
-    st.session_state.difficulty = "Hard"
+for key, value in defaults.items():
 
-if "player_score" not in st.session_state:
-    st.session_state.player_score = 0
-
-if "ai_score" not in st.session_state:
-    st.session_state.ai_score = 0
-
-if "draws" not in st.session_state:
-    st.session_state.draws = 0
-
-if "status" not in st.session_state:
-    st.session_state.status = "Your Turn"
-
-if "game_over" not in st.session_state:
-    st.session_state.game_over = False
-
-if "winner_combo" not in st.session_state:
-    st.session_state.winner_combo = []
-
-if "result" not in st.session_state:
-    st.session_state.result = ""
-
-if "page" not in st.session_state:
-    st.session_state.page = "home"
-
-if "starting_player" not in st.session_state:
-    st.session_state.starting_player = "player"
+    if key not in st.session_state:
+        st.session_state[key] = value
 
 # ---------- SCORE ----------
 def load_scores():
@@ -476,7 +462,7 @@ def save_scores():
 
 load_scores()
 
-# ---------- LOGIC ----------
+# ---------- GAME LOGIC ----------
 def check_winner(board, p):
 
     combos = [
@@ -594,12 +580,15 @@ def end_game(text, result):
     st.session_state.result = text
 
     if result == "player":
+
         st.session_state.player_score += 1
 
     elif result == "ai":
+
         st.session_state.ai_score += 1
 
     else:
+
         st.session_state.draws += 1
 
     save_scores()
@@ -635,7 +624,7 @@ def move(i):
 
     time.sleep(0.5)
 
-    ai_index = ai_move()
+    ai_move()
 
     combo = check_winner(st.session_state.board, ai)
 
@@ -758,37 +747,58 @@ elif st.session_state.page == "game":
             unsafe_allow_html=True
         )
 
-    # GRID
+    # ---------- GRID ----------
+    button_index = 0
+
     for row in range(3):
 
         cols = st.columns(3)
 
         for col in range(3):
-
             i = row * 3 + col
 
             text = st.session_state.board[i]
 
-            if i in st.session_state.winner_combo:
+            # only winning cells become green
+            bg_color = WIN if i in st.session_state.winner_combo else CARD
 
-                st.markdown(f"""
+            # Streamlit button position selector
+            st.markdown(
+                f"""
                 <style>
-                div[data-testid="stButton"] button[kind="secondary"] {{
-                    background-color: {WIN};
+
+                div[data-testid="stButton"]:nth-of-type({button_index + 1}) button {{
+                    background-color: {bg_color} !important;
+                    color: white !important;
+                    height: 140px !important;
+                    width: 100% !important;
+                    border-radius: 20px !important;
+                    border: none !important;
+                    font-size: 48px !important;
+                    font-weight: bold !important;
                 }}
+
                 </style>
-                """, unsafe_allow_html=True)
+                """,
+                unsafe_allow_html=True
+            )
 
             with cols[col]:
-
                 st.button(
-                    text,
-                    key=i,
+                    text if text != " " else " ",
+                    key=f"cell_{i}",
                     on_click=move,
-                    args=(i,)
+                    args=(i,),
+                    disabled=(
+                            st.session_state.game_over
+                            or st.session_state.board[i] != " "
+                    ),
+                    use_container_width=True
                 )
 
-    # BUTTONS
+            button_index += 1
+
+    # ---------- BUTTONS ----------
     if st.session_state.game_over:
 
         col1, col2 = st.columns(2)
