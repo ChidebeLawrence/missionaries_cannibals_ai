@@ -1,11 +1,13 @@
-import tkinter as tk
-from tkinter import messagebox
-from collections import deque
+import streamlit as st
 import math
+import time
+from collections import deque
+import matplotlib.pyplot as plt
+from matplotlib.patches import Circle, Polygon, Arc
 
 # =========================================================
 # MISSIONARIES & CANNIBALS AI
-# Ultra Modern GUI + Smooth Animation + BFS
+# NORMAL STREAMLIT DISPLAY VERSION
 # =========================================================
 
 TOTAL_M = 3
@@ -29,7 +31,6 @@ RIVER = "#00aaff"
 BANK = "#16351f"
 NEON = "#00ffe1"
 RED = "#ff3b5f"
-SHADOW = "#050505"
 
 # =========================================================
 # BFS LOGIC
@@ -66,6 +67,7 @@ def get_successors(state):
     for m, c in MOVES:
 
         if boat == 0:
+
             new_state = (
                 m_left - m,
                 c_left - c,
@@ -73,6 +75,7 @@ def get_successors(state):
             )
 
         else:
+
             new_state = (
                 m_left + m,
                 c_left + c,
@@ -110,6 +113,7 @@ def bfs():
         for neighbor in get_successors(current):
 
             if neighbor not in visited:
+
                 queue.append(
                     (neighbor, path + [neighbor])
                 )
@@ -118,518 +122,546 @@ def bfs():
 
 
 # =========================================================
-# GUI
+# DRAW CHARACTER
 # =========================================================
 
-class AI3DGUI:
+def draw_character(ax, x, y, color, label):
 
-    def __init__(self, root):
+    # SHADOW
+    shadow = Circle(
+        (x + 0.06, y - 0.06),
+        0.30,
+        color="black",
+        alpha=0.5
+    )
+    ax.add_patch(shadow)
 
-        self.root = root
-        self.root.title("3D Missionaries & Cannibals AI")
-        self.root.geometry("1400x680")
-        self.root.configure(bg=BG)
+    # BODY
+    body = Circle(
+        (x, y),
+        0.30,
+        color=color
+    )
+    ax.add_patch(body)
 
-        self.solution = bfs()
-        self.step = 0
-        self.auto = False
-        self.wave_offset = 0
+    # HIGHLIGHT
+    highlight = Circle(
+        (x - 0.1, y + 0.1),
+        0.08,
+        color="white"
+    )
+    ax.add_patch(highlight)
 
-        # =================================================
-        # TITLE
-        # =================================================
+    # LABEL
+    ax.text(
+        x,
+        y,
+        label,
+        ha="center",
+        va="center",
+        fontsize=14,
+        fontweight="bold",
+        color="black"
+    )
 
-        title = tk.Label(
-            root,
-            text="MISSIONARIES & CANNIBALS AI",
-            font=("Orbitron", 34, "bold"),
-            fg=NEON,
-            bg=BG
-        )
-        title.pack(pady=10)
 
-        subtitle = tk.Label(
-            root,
-            text="3D BFS VISUALIZATION",
-            font=("Arial", 14),
-            fg="white",
-            bg=BG
-        )
-        subtitle.pack()
+# =========================================================
+# DRAW BOAT
+# =========================================================
 
-        # =================================================
-        # MAIN CANVAS
-        # =================================================
+def draw_boat(ax, x, y):
 
-        self.canvas = tk.Canvas(
-            root,
-            width=1280,
-            height=420,
-            bg=PANEL,
-            highlightthickness=0
-        )
-        self.canvas.pack(pady=25)
+    boat = Polygon(
+        [
+            (x, y),
+            (x + 1.4, y),
+            (x + 1.15, y - 0.35),
+            (x + 0.25, y - 0.35)
+        ],
+        closed=True,
+        facecolor="#8B4513",
+        edgecolor=NEON,
+        linewidth=2.5
+    )
 
-        # =================================================
-        # STATUS PANEL
-        # =================================================
+    ax.add_patch(boat)
 
-        self.info = tk.Label(
-            root,
-            text="",
-            font=("Arial", 16, "bold"),
-            fg="white",
-            bg=BG
-        )
-        self.info.pack()
+    ax.text(
+        x + 0.7,
+        y - 0.15,
+        "BOAT",
+        ha="center",
+        va="center",
+        color="white",
+        fontsize=10,
+        fontweight="bold"
+    )
 
-        self.move_text = tk.Label(
-            root,
-            text="",
-            font=("Arial", 13),
-            fg=NEON,
-            bg=BG
-        )
-        self.move_text.pack(pady=10)
 
-        # =================================================
-        # CONTROLS
-        # =================================================
+# =========================================================
+# DRAW SCENE
+# =========================================================
 
-        controls = tk.Frame(root, bg=BG)
-        controls.pack(pady=20)
+def draw_scene(state, wave_offset=0):
 
-        self.make_button(
-            controls,
-            "◀ Previous",
-            "#252525",
-            self.prev_step
-        ).grid(row=0, column=0, padx=12)
+    m_left, c_left, boat = state
 
-        self.make_button(
-            controls,
-            "Next ▶",
-            "#00aa88",
-            self.next_step
-        ).grid(row=0, column=1, padx=12)
+    m_right = TOTAL_M - m_left
+    c_right = TOTAL_C - c_left
 
-        self.make_button(
-            controls,
-            "Auto Simulation",
-            "#0066ff",
-            self.start_auto
-        ).grid(row=0, column=2, padx=12)
+    fig, ax = plt.subplots(figsize=(16, 5.5))
 
-        self.make_button(
-            controls,
-            "Reset",
-            "#aa2222",
-            self.reset
-        ).grid(row=0, column=3, padx=12)
+    fig.patch.set_facecolor(BG)
+    ax.set_facecolor(PANEL)
 
-        self.animate_scene()
-        self.show_state()
+    ax.set_xlim(0, 14)
+    ax.set_ylim(0, 6)
+
+    ax.axis("off")
 
     # =====================================================
-    # BUTTON STYLE
+    # LEFT BANK
     # =====================================================
 
-    def make_button(self, parent, text, color, command):
-
-        return tk.Button(
-            parent,
-            text=text,
-            command=command,
-            bg=color,
-            fg="white",
-            activebackground=NEON,
-            activeforeground="black",
-            font=("Arial", 13, "bold"),
-            width=16,
-            relief="flat",
-            bd=0,
-            cursor="hand2",
-            pady=12
-        )
+    left_bank = Polygon(
+        [(0, 0), (3, 0), (3, 6), (0, 6)],
+        closed=True,
+        facecolor=BANK
+    )
+    ax.add_patch(left_bank)
 
     # =====================================================
-    # 3D CHARACTER
+    # RIVER
     # =====================================================
 
-    def draw_3d_character(self, x, y, color, label):
-
-        # SHADOW
-        self.canvas.create_oval(
-            x + 10,
-            y + 55,
-            x + 60,
-            y + 75,
-            fill="#000000",
-            outline=""
-        )
-
-        # BODY SHADOW
-        self.canvas.create_oval(
-            x + 5,
-            y + 5,
-            x + 55,
-            y + 55,
-            fill="#111111",
-            outline=""
-        )
-
-        # BODY
-        self.canvas.create_oval(
-            x,
-            y,
-            x + 50,
-            y + 50,
-            fill=color,
-            outline=""
-        )
-
-        # HIGHLIGHT
-        self.canvas.create_oval(
-            x + 8,
-            y + 8,
-            x + 20,
-            y + 20,
-            fill="white",
-            outline=""
-        )
-
-        # LABEL
-        self.canvas.create_text(
-            x + 25,
-            y + 25,
-            text=label,
-            font=("Arial", 14, "bold"),
-            fill="black"
-        )
+    river = Polygon(
+        [(3, 0), (11, 0), (11, 6), (3, 6)],
+        closed=True,
+        facecolor=RIVER
+    )
+    ax.add_patch(river)
 
     # =====================================================
-    # 3D BOAT
+    # RIGHT BANK
     # =====================================================
 
-    def draw_boat(self, x, y):
+    right_bank = Polygon(
+        [(11, 0), (14, 0), (14, 6), (11, 6)],
+        closed=True,
+        facecolor=BANK
+    )
+    ax.add_patch(right_bank)
 
-        # SHADOW
-        self.canvas.create_polygon(
-            x + 10, y + 50,
-            x + 140, y + 50,
-            x + 120, y + 80,
-            x + 20, y + 80,
-            fill="#000000",
-            outline=""
+    # =====================================================
+    # WATER WAVES
+    # =====================================================
+
+    for i in range(45):
+
+        x = 3 + i * 0.19
+
+        y = 3 + math.sin(
+            (i + wave_offset) * 0.5
+        ) * 0.15
+
+        wave = Arc(
+            (x, y),
+            0.3,
+            0.12,
+            theta1=0,
+            theta2=180,
+            color="white",
+            linewidth=1.3
         )
 
-        # BOAT BODY
-        self.canvas.create_polygon(
-            x, y,
-            x + 130, y,
-            x + 110, y + 30,
-            x + 20, y + 30,
-            fill="#8B4513",
-            outline=NEON,
-            width=3
-        )
+        ax.add_patch(wave)
 
-        # BOAT TOP
-        self.canvas.create_polygon(
-            x + 10, y - 10,
-            x + 120, y - 10,
-            x + 130, y,
-            x, y,
-            fill="#A0522D",
-            outline=""
-        )
+    # =====================================================
+    # BANK LABELS
+    # =====================================================
 
-        # BOAT LABEL
-        self.canvas.create_text(
-            x + 65,
-            y + 12,
-            text="BOAT",
-            fill="white",
-            font=("Arial", 12, "bold")
+    ax.text(
+        1.5,
+        5.5,
+        "LEFT BANK",
+        color="white",
+        fontsize=20,
+        fontweight="bold",
+        ha="center"
+    )
+
+    ax.text(
+        12.5,
+        5.5,
+        "RIGHT BANK",
+        color="white",
+        fontsize=20,
+        fontweight="bold",
+        ha="center"
+    )
+
+    # =====================================================
+    # LEFT MISSIONARIES
+    # =====================================================
+
+    for i in range(m_left):
+
+        draw_character(
+            ax,
+            1,
+            4.5 - i,
+            "white",
+            "M"
         )
 
     # =====================================================
-    # ANIMATION
+    # LEFT CANNIBALS
     # =====================================================
 
-    def animate_scene(self):
+    for i in range(c_left):
 
-        self.wave_offset += 5
-
-        self.show_state()
-
-        self.root.after(90, self.animate_scene)
+        draw_character(
+            ax,
+            2,
+            4.5 - i,
+            RED,
+            "C"
+        )
 
     # =====================================================
-    # DRAW SCENE
+    # RIGHT MISSIONARIES
     # =====================================================
 
-    def show_state(self):
+    for i in range(m_right):
 
-        self.canvas.delete("all")
-
-        state = self.solution[self.step]
-
-        m_left, c_left, boat = state
-
-        m_right = TOTAL_M - m_left
-        c_right = TOTAL_C - c_left
-
-        # =================================================
-        # BACKGROUND DEPTH EFFECT
-        # =================================================
-
-        self.canvas.create_rectangle(
-            0, 0, 1280, 560,
-            fill=PANEL,
-            outline=""
+        draw_character(
+            ax,
+            12,
+            4.5 - i,
+            "white",
+            "M"
         )
 
-        # LEFT BANK
-        self.canvas.create_polygon(
-            0, 0,
-            350, 40,
-            350, 520,
-            0, 560,
-            fill=BANK,
-            outline=""
+    # =====================================================
+    # RIGHT CANNIBALS
+    # =====================================================
+
+    for i in range(c_right):
+
+        draw_character(
+            ax,
+            13,
+            4.5 - i,
+            RED,
+            "C"
         )
 
-        # RIGHT BANK
-        self.canvas.create_polygon(
-            930, 40,
-            1280, 0,
-            1280, 560,
-            930, 520,
-            fill=BANK,
-            outline=""
+    # =====================================================
+    # BOAT
+    # =====================================================
+
+    boat_x = 3.6 if boat == 0 else 9
+
+    draw_boat(
+        ax,
+        boat_x,
+        1.3
+    )
+
+    # =====================================================
+    # REMOVE EXTRA PADDING
+    # =====================================================
+
+    fig.subplots_adjust(
+        left=0,
+        right=1,
+        top=1,
+        bottom=0
+    )
+
+    return fig
+
+
+# =========================================================
+# STREAMLIT CONFIG
+# =========================================================
+
+st.set_page_config(
+    page_title="Missionaries & Cannibals AI",
+    layout="wide"
+)
+
+# =========================================================
+# CUSTOM CSS
+# =========================================================
+
+st.markdown(
+    f"""
+    <style>
+
+    html,
+    body,
+    [data-testid="stAppViewContainer"],
+    .stApp {{
+        background: {BG};
+    }}
+
+    .block-container {{
+        padding-top: 1rem;
+        padding-bottom: 1rem;
+        padding-left: 2rem;
+        padding-right: 2rem;
+        max-width: 1400px;
+    }}
+
+    /* TITLE */
+
+    .title {{
+        text-align: center;
+        color: {NEON};
+        font-size: 42px;
+        font-weight: bold;
+        margin-bottom: 0;
+    }}
+
+    .subtitle {{
+        text-align: center;
+        color: white;
+        margin-top: 0;
+        margin-bottom: 20px;
+    }}
+
+    /* STATUS */
+
+    .status {{
+        text-align: center;
+        color: white;
+        font-size: 22px;
+        font-weight: bold;
+        margin-top: 20px;
+    }}
+
+    .move {{
+        text-align: center;
+        color: {NEON};
+        font-size: 20px;
+        font-weight: bold;
+        margin-top: 10px;
+        margin-bottom: 20px;
+    }}
+
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
+# =========================================================
+# SESSION STATE
+# =========================================================
+
+solution = bfs()
+
+if "step" not in st.session_state:
+    st.session_state.step = 0
+
+if "wave" not in st.session_state:
+    st.session_state.wave = 0
+
+# =========================================================
+# TITLE
+# =========================================================
+
+st.markdown(
+    f"""
+    <div class="title">
+        MISSIONARIES & CANNIBALS AI
+    </div>
+
+    <div class="subtitle">
+        3D BFS VISUALIZATION
+    </div>
+    """,
+    unsafe_allow_html=True
+)
+
+# =========================================================
+# CURRENT STATE
+# =========================================================
+
+state = solution[st.session_state.step]
+
+m_left, c_left, boat = state
+
+m_right = TOTAL_M - m_left
+c_right = TOTAL_C - c_left
+
+# =========================================================
+# VISUALIZATION
+# =========================================================
+
+fig = draw_scene(
+    state,
+    st.session_state.wave
+)
+
+st.pyplot(
+    fig,
+    use_container_width=True
+)
+
+# =========================================================
+# STATUS
+# =========================================================
+
+st.markdown(
+    f"""
+    <div class="status">
+
+    STEP {st.session_state.step + 1}/{len(solution)}
+
+    <br>
+
+    LEFT: {m_left}M {c_left}C
+
+    &nbsp;&nbsp;&nbsp; • &nbsp;&nbsp;&nbsp;
+
+    RIGHT: {m_right}M {c_right}C
+
+    </div>
+    """,
+    unsafe_allow_html=True
+)
+
+# =========================================================
+# MOVE TEXT
+# =========================================================
+
+if st.session_state.step > 0:
+
+    prev = solution[
+        st.session_state.step - 1
+    ]
+
+    pm, pc, _ = prev
+
+    moved_m = abs(pm - m_left)
+    moved_c = abs(pc - c_left)
+
+    move = "Boat moved "
+
+    if moved_m:
+        move += (
+            f"{moved_m} Missionary(s)"
         )
 
-        # RIVER
-        self.canvas.create_polygon(
-            350, 40,
-            930, 40,
-            930, 520,
-            350, 520,
-            fill=RIVER,
-            outline=""
+    if moved_c:
+        move += (
+            f" and {moved_c} Cannibal(s)"
         )
 
-        # =================================================
-        # WATER ANIMATION
-        # =================================================
+else:
 
-        # WATER WAVES ONLY INSIDE RIVER
+    move = "Initial State"
 
-        for i in range(350, 930, 35):
-            y = 220 + math.sin(
-                (i + self.wave_offset) * 0.04
-            ) * 12
+st.markdown(
+    f"""
+    <div class="move">
+        {move}
+    </div>
+    """,
+    unsafe_allow_html=True
+)
 
-            self.canvas.create_arc(
-                i,
-                y,
-                i + 45,
-                y + 18,
-                start=0,
-                extent=180,
-                style="arc",
-                outline="white",
-                width=2
-            )
+# =========================================================
+# CONTROLS
+# =========================================================
 
-        # =================================================
-        # BANK LABELS
-        # =================================================
+col1, col2, col3, col4 = st.columns(4)
 
-        self.canvas.create_text(
-            170,
-            45,
-            text="LEFT BANK",
-            fill="white",
-            font=("Arial", 22, "bold")
-        )
+# =========================================================
+# PREVIOUS
+# =========================================================
 
-        self.canvas.create_text(
-            1110,
-            45,
-            text="RIGHT BANK",
-            fill="white",
-            font=("Arial", 22, "bold")
-        )
+with col1:
 
-        # =================================================
-        # LEFT CHARACTERS
-        # =================================================
+    if st.button(
+        "◀ Previous",
+        use_container_width=True
+    ):
 
-        for i in range(m_left):
+        if st.session_state.step > 0:
 
-            self.draw_3d_character(
-                90,
-                120 + i * 120,
-                "white",
-                "M"
-            )
+            st.session_state.step -= 1
+            st.session_state.wave += 1
 
-        for i in range(c_left):
+            st.rerun()
 
-            self.draw_3d_character(
-                230,
-                120 + i * 120,
-                RED,
-                "C"
-            )
+# =========================================================
+# NEXT
+# =========================================================
 
-        # =================================================
-        # RIGHT CHARACTERS
-        # =================================================
+with col2:
 
-        for i in range(m_right):
+    if st.button(
+        "Next ▶",
+        use_container_width=True
+    ):
 
-            self.draw_3d_character(
-                1030,
-                120 + i * 120,
-                "white",
-                "M"
-            )
+        if (
+            st.session_state.step
+            < len(solution) - 1
+        ):
 
-        for i in range(c_right):
+            st.session_state.step += 1
+            st.session_state.wave += 1
 
-            self.draw_3d_character(
-                1170,
-                120 + i * 120,
-                RED,
-                "C"
-            )
-
-        # =================================================
-        # 3D BOAT
-        # =================================================
-
-        boat_x = 280 if boat == 0 else 860
-
-        self.draw_boat(
-            boat_x,
-            390
-        )
-
-        # =================================================
-        # STATUS
-        # =================================================
-
-        self.info.config(
-            text=(
-                f"STEP {self.step + 1}/{len(self.solution)}"
-                f"   •   "
-                f"LEFT: {m_left}M {c_left}C"
-                f"   •   "
-                f"RIGHT: {m_right}M {c_right}C"
-            )
-        )
-
-        # =================================================
-        # MOVE TEXT
-        # =================================================
-
-        if self.step > 0:
-
-            prev = self.solution[self.step - 1]
-
-            pm, pc, _ = prev
-
-            moved_m = abs(pm - m_left)
-            moved_c = abs(pc - c_left)
-
-            move = f"Boat moved "
-
-            if moved_m:
-                move += f"{moved_m} Missionary(s)"
-
-            if moved_c:
-                move += f" and {moved_c} Cannibal(s)"
-
-            self.move_text.config(text=move)
+            st.rerun()
 
         else:
-            self.move_text.config(
-                text="Initial State"
-            )
 
-    # =====================================================
-    # CONTROLS
-    # =====================================================
-
-    def next_step(self):
-
-        if self.step < len(self.solution) - 1:
-
-            self.step += 1
-            self.show_state()
-
-        else:
-
-            messagebox.showinfo(
-                "SUCCESS",
+            st.success(
                 "Everyone crossed safely 😎"
             )
 
-    def prev_step(self):
-
-        if self.step > 0:
-
-            self.step -= 1
-            self.show_state()
-
-    def reset(self):
-
-        self.step = 0
-        self.auto = False
-        self.show_state()
-
-    # =====================================================
-    # AUTO PLAY
-    # =====================================================
-
-    def start_auto(self):
-
-        self.auto = True
-        self.auto_play()
-
-    def auto_play(self):
-
-        if self.auto:
-
-            if self.step < len(self.solution) - 1:
-
-                self.step += 1
-                self.show_state()
-
-                self.root.after(
-                    1700,
-                    self.auto_play
-                )
-
-            else:
-
-                self.auto = False
-
-                messagebox.showinfo(
-                    "COMPLETED",
-                    "Optimal BFS solution found 🔥"
-                )
-
-
 # =========================================================
-# RUN APP
+# AUTO SIMULATION
 # =========================================================
 
-root = tk.Tk()
+with col3:
 
-app = AI3DGUI(root)
+    if st.button(
+        "Auto Simulation",
+        use_container_width=True
+    ):
 
-root.mainloop()
+        for _ in range(
+            st.session_state.step,
+            len(solution) - 1
+        ):
+
+            st.session_state.step += 1
+            st.session_state.wave += 1
+
+            time.sleep(1)
+
+            st.rerun()
+
+        st.success(
+            "Optimal BFS solution found 🔥"
+        )
+
+# =========================================================
+# RESET
+# =========================================================
+
+with col4:
+
+    if st.button(
+        "Reset",
+        use_container_width=True
+    ):
+
+        st.session_state.step = 0
+        st.session_state.wave = 0
+
+        st.rerun()
